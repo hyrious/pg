@@ -1,0 +1,20 @@
+{
+    "private": true,
+    "scripts": {
+        "start": "ts-node -P tsconfig-node.json src/index.ts",
+        "start:prod": "node --enable-source-maps dist/index.cjs.js",
+        "build": "rimraf dist && run-p build:*",
+        "build:cjs": "esbuild --bundle src/index.ts --platform=node --tsconfig=tsconfig-node.json --minify --sourcemap --outfile=dist/index.cjs.js",
+        "build:esm": "esbuild --bundle src/index.ts --format=esm --tsconfig=tsconfig.json --minify --sourcemap --outfile=dist/index.esm.js",
+        "build:iife": "esbuild --bundle src/index.ts --tsconfig=tsconfig.json --global-name=pg --minify --sourcemap --outfile=dist/index.iife.js"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@types/node": "^14.14.10",
+        "@types/qs": "^6.9.5",
+        "esbuild": "^0.8.17",
+        "npm-run-all": "^4.1.5",
+        "qs": "^6.9.4",
+        "rimraf": "^3.0.2"
+    }
+}

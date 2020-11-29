@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "lib": ["esnext"],
+        "noEmit": true,
+        "module": "esnext",
+        "target": "esnext",
+        "strictNullChecks": true,
+        "skipLibCheck": true,
+        "moduleResolution": "Node",
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": ["src"]
+}
