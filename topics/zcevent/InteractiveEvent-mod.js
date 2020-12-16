@@ -45,7 +45,7 @@ void (function() {
     };
 
     // 距离角色多近 (格数) 就显示可用操作
-    var Distance = 3;
+    var Distance = 1;
 
     // 高级: 自定义距离判定方式 (覆盖 Distance 配置)
     function testDistance(event, player) {
@@ -54,27 +54,22 @@ void (function() {
             return false;
         }
         // 碰撞盒检测
-        var dx = event.x - player.x;
-        var dy = event.y - player.y;
-        // 1. 去掉距离过远的 (单位: 地图单元格), 降低检测压力
-        var distance = Math.abs(dx) + Math.abs(dy);
-        // 这里使用了固定数字 Distance, 也可以根据 event 图像动态决定这个距离
-        if (distance <= Distance) {
-            // 2. 计算角色 -> 事件的方向, 如果角色无法通过 (canPass), 那么返回真
-            var dir;
-            if (Math.abs(dx) > Math.abs(dy)) {
-                dir = dx > 0 ? 4 : 6;
-            } else {
-                dir = dy > 0 ? 8 : 2;
-            }
-            // QMovement 默认的检测距离是 moveTiles() = 1px
-            // 考虑自定义距离的话, 可以把下面一行换为 (其中 4 就是自定义距离)
-            // if (!player.canPixelPass(player._px, player._py, dir, 4)) {
-            if (!player.canPass(player._x, player._y, dir)) {
-                return true;
+        var dist = 3;
+        var type = 'interaction';
+        var dirs = [2, 4, 6, 8];
+        var result = false;
+        for (var i in dirs) {
+            var dir = dirs[i];
+            var x1 = $gameMap.roundPXWithDirection(player._px, dir, dist);
+            var y1 = $gameMap.roundPYWithDirection(player._py, dir, dist);
+            player.collider(type).moveTo(x1, y1);
+            if (player.collidedWithCharacter(type, event)) {
+                result = true;
+                break;
             }
         }
-        return false;
+        player.collider(type).moveTo(player._px, player._py);
+        return result;
     }
 
     // 参考 Input.keyMapper, <press> 中声明的按键会使用
