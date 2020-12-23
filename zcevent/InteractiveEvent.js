@@ -258,6 +258,7 @@ void (function() {
         var actions = this._character._cachedInteractiveEventActions;
         if (actions == null) {
             this._interactiveEventPanel.bitmap = null;
+            this._interactiveEventPanel.opacity = 0;
             return;
         }
         var nameIndex = getNameIndex(actions);
