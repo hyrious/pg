@@ -242,6 +242,8 @@ void (function() {
             this.addChild(this._interactiveEventPanel);
         }
         this._interactiveEventPanelOffsetXY = [0, 0];
+        this._interactiveBlendColorDump = [0, 0, 0, 0];
+        this._interactiveBlendColorAlpha = 0;
     };
 
     var helperBitmap = new Bitmap(0, 0);
@@ -343,22 +345,34 @@ void (function() {
         this._interactiveEventPanel.bitmap = bitmap;
     };
 
+    var setBlendColor = Sprite_Character.prototype.setBlendColor;
+    Sprite_Character.prototype.setBlendColor = function(color, flag) {
+        if (!flag) {
+            this._interactiveBlendColorDump = this._blendColor;
+        }
+        setBlendColor.call(this, color);
+    };
+
     Sprite_Character.prototype.updateInteractivePanel = function() {
         if (this._interactiveEventPanel.bitmap) {
             var isShow = this._character._interactiveEventActions != null;
             var offset = this._interactiveEventPanelOffsetXY;
             this._interactiveEventPanel.x = -this._frame.width / 2 + offset[0];
             this._interactiveEventPanel.y = -this._frame.height + offset[1];
-            var blendColor = BlendColor.clone();
-            var alpha = this.getBlendColor()[3];
+            var alpha = this._interactiveBlendColorAlpha;
             if (isShow) {
                 this._interactiveEventPanel.opacity += 15;
-                blendColor[3] = (alpha + 15).clamp(0, BlendColor[3]);
+                this._interactiveBlendColorAlpha = (alpha + 15).clamp(0, BlendColor[3]);
             } else {
                 this._interactiveEventPanel.opacity -= 15;
-                blendColor[3] = (alpha - 15).clamp(0, BlendColor[3]);
+                this._interactiveBlendColorAlpha = (alpha - 15).clamp(0, BlendColor[3]);
             }
-            this.setBlendColor(blendColor);
+            var blendColor = BlendColor.clone();
+            blendColor[3] = this._interactiveBlendColorAlpha;
+            this.setBlendColor(blendColor, true);
+        } else if (this._interactiveBlendColorDump) {
+            this._interactiveEventPanel.opacity -= 15;
+            this.setBlendColor(this._interactiveBlendColorDump, true);
         }
     };
 
