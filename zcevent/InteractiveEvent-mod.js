@@ -371,6 +371,7 @@ void (function() {
             blendColor[3] = this._interactiveBlendColorAlpha;
             this.setBlendColor(blendColor, true);
         } else if (this._interactiveBlendColorDump) {
+            this._interactiveBlendColorAlpha = 0;
             this._interactiveEventPanel.opacity -= 15;
             this.setBlendColor(this._interactiveBlendColorDump, true);
         }
