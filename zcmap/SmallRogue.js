@@ -98,7 +98,8 @@ void (function SmallRogue() {
         invalidMapId: 'Invalid mapId at {loc}. Expect 1+, got {arg}.',
         notFoundStack: 'Not found stack at {loc} called {arg}.',
         stackEmpty: 'Pop empty stack at {loc} called {arg}.',
-        notFoundTargets: 'Not found any target to transfer.'
+        notFoundTargets: 'Not found any target to transfer.',
+        NotCurrentMap: 'Call to SmallRogue at {loc} is not on current map.'
     }
 
     // 将 args 填入 template 并返回
@@ -111,13 +112,16 @@ void (function SmallRogue() {
     };
 
     // 返回 [地图ID, 事件ID, 事件页下标, 事件指令下标]
-    // 如果当前事件的执行位置不是当前地图, 返回 undefined
+    // 如果当前事件的执行位置不是当前地图, 报错
     function getLocation(self) {
         if (self.isOnCurrentMap()) {
             var event = $gameMap.event(self._eventId);
             var pageIndex = event._pageIndex;
             return [self._mapId, self._eventId, pageIndex, self._index];
         }
+        throw new Error(f(err.NotCurrentMap, {
+            loc: [self._mapId, self._eventId]
+        }));
     }
 
     // 判定下一个事件是否为场所移动事件
@@ -221,8 +225,8 @@ void (function SmallRogue() {
         return mapId;
     }
 
-    // 从 command 里取出目标地图（模板地图）的 ID
-    function getRefMapId(command) {
+    // 从 command 里取出目标地图的 ID
+    function getTargetMapId(command) {
         // 普通场所移动事件的情况
         if (command.code === 201) {
             return resolveMapIdFromCommand201Params(command.parameters);
@@ -239,15 +243,21 @@ void (function SmallRogue() {
         return map.currentMapId;
     }
 
+    // 同一个模板地图最多生成多少次新地图，这个数字未必准确，因为存在没有地图可生成的情况
+    SmallRogue.MaxNewMaps = 3;
+
     // 获取场所移动目的地地图 ID 列表，他们都由 refMapId 生成
     // 其中有一个特殊的 0, 表示生成新地图
     function getTargets(map, refMapId) {
-        var targets = [0];
+        var targets = [];
         map.forEach(function(refId, newId) {
             if (refId === refMapId) {
                 targets.push(parseInt(newId));
             }
         });
+        if (targets.length < SmallRogue.MaxNewMaps) {
+            targets.push(0);
+        }
         return targets;
     }
 
@@ -256,10 +266,13 @@ void (function SmallRogue() {
         command = JsonEx.parse(JsonEx.stringify(command));
         // 普通场所移动事件的情况
         if (command.code === 201) {
-            if (command.parameters[0] === 0) {  // 直接移动
-                command.parameters[1] = mapId;
-            } else {                            // 间接移动
-                $gameVariables.setValue(command.parameters[1], mapId);
+            var parameters = command.parameters;
+            if (parameters[0] === 0) {  // 直接移动
+                parameters[1] = mapId;
+            } else {                    // 间接移动, 修改为直接移动
+                parameters.splice(0, 2, 0, mapId);
+                parameters[2] = $gameVariables.value(parameters[2]);
+                parameters[3] = $gameVariables.value(parameters[3]);
             }
         }
         // qMovement 的情况
@@ -282,7 +295,7 @@ void (function SmallRogue() {
             }));
         }
         var item = sample(candidates);
-        var refMapId = getRefMapId(item.command);
+        var refMapId = getTargetMapId(item.command);
         if (Number.isNaN(refMapId) || refMapId < 0) {
             throw new Error(f(err.invalidMapId, {
                 loc: loc,
@@ -307,7 +320,10 @@ void (function SmallRogue() {
         firstAddLocation.forEach(function(e) {
             args.push(e);
         });
-        args.push(result);
+        args.push({
+            command: result,
+            from: loc
+        });
         map.set.apply(map, args);
     };
 
@@ -361,8 +377,57 @@ void (function SmallRogue() {
         if (exist) {
             mapId = exist;
         }
+        DataManager._mapId = mapId;
         _loadMapData.call(DataManager, mapId);
     };
+
+    function findAndInject(dataMap, refMapId, mapId, x, y) {
+        dataMap.events.forEach(function(e) {
+            if (e && e.x === x && e.y === y) e.pages.forEach(function(page) {
+                var counter = 0;
+                var firstAddLocationIndex;
+                var targetCommand;
+                page.list.forEach(function(command, index) {
+                    if (!targetCommand) {
+                        if (command.code === 356) {
+                            var args = command.parameters[0].split(' ');
+                            if (args[0] === 'SmallRogue' && args[1] === 'add') {
+                                if (!firstAddLocationIndex) {
+                                    firstAddLocationIndex = index;
+                                }
+                                counter = args[2].split(',').length;
+                            }
+                        }
+                        if (counter > 0) {
+                            counter--;
+                            var target = getTargetMapId(command);
+                            if (target === refMapId) {
+                                targetCommand = command;
+                            }
+                        }
+                    }
+                });
+                if (targetCommand) {
+                    targetCommand = injectMapId(targetCommand, mapId);
+                    page.list[firstAddLocation] = targetCommand;
+                }
+            });
+        });
+    }
+
+    function getTargetXY(command) {
+        if (command.code === 201) {
+            return command.parameters.slice(2, 4);
+        }
+        if (command.code === 356) {
+            // 像素位置，直接除以一个图块大小求事件坐标了 = =
+            var args = command.parameters[0].split(' ');
+            return [
+                Math.floor(parseInt(args[3]) / 48),
+                Math.floor(parseInt(args[4]) / 48)
+            ];
+        }
+    }
 
     // 在读入地图时，修改地图数据:
     // 已经存在此脚本动过的事件的，直接替换成相关事件指令
@@ -371,7 +436,30 @@ void (function SmallRogue() {
     DataManager.onLoad = function(object) {
         _onLoad.call(this, object);
         if (object === $dataMap) {
-
+            var mapId = DataManager._mapId;
+            var map = $gameSystem.getSmallRogueMap();
+            map.forEach(function(value, key) {
+                var loc = key.split(',');
+                if (loc.length === 4) {
+                    if (parseInt(loc[0]) === mapId) {
+                        var eventId = parseInt(loc[1]);
+                        var pageIndex = parseInt(loc[2]);
+                        var index = parseInt(loc[3]);
+                        object.events.forEach(function(e) {
+                            if (e && e.id === eventId) {
+                                var page = e.pages[pageIndex];
+                                page[index] = value.command;
+                            }
+                        });
+                    }
+                    if (getTargetMapId(value.command) === mapId) {
+                        var fromMapId = value.from[0];
+                        var fromRefMapId = map.get(fromMapId);
+                        var xy = getTargetXY(value.command);
+                        findAndInject(object, fromRefMapId, fromMapId, xy[0], xy[1]);
+                    }
+                }
+            });
         }
     };
 })();
