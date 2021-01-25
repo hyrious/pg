@@ -409,7 +409,7 @@ void (function SmallRogue() {
                 });
                 if (targetCommand) {
                     targetCommand = injectMapId(targetCommand, mapId);
-                    page.list[firstAddLocation] = targetCommand;
+                    page.list[firstAddLocationIndex] = targetCommand;
                 }
             });
         });
