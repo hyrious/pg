@@ -83,6 +83,9 @@ class SmallRogueMap {
 // $gameSystem.getSmallRogueMap()
 Game_System.prototype.getSmallRogueMap = function() {
     this.smallRogueMap || (this.smallRogueMap = new SmallRogueMap());
+    if (!(this.smallRogueMap instanceof SmallRogueMap)) {
+        this.smallRogueMap['__proto__'] = SmallRogueMap.prototype;
+    }
     return this.smallRogueMap;
 };
 
