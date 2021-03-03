@@ -1,6 +1,9 @@
 const $ = sel => document.querySelector(sel)
 let canvas = $('#app')
 let ctx = canvas.getContext('2d')
+ctx.lineJoin = "round"
+ctx.lineCap = "round"
+ctx.miterLimit = 100
 let drawing = false
 let path = []
 let last = null
